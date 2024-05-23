@@ -5,11 +5,17 @@ resources:
 - repo: self
 
 variables:
-  dockerRegistryServiceConnection: 'CICDsampleregistry'  # Use the correct service connection name
+  # Azure Container Registry connection established during pipeline creation
+  dockerRegistryServiceConnection: 'CICDsampleregistry'
+  # Docker repository name
   imageRepository: 'javascriptdocker'
+  # Docker container registry URL
   containerRegistry: 'sampleappcontainerregistry.azurecr.io'
+  # Path to the Dockerfile in your repository
   dockerfilePath: '$(Build.SourcesDirectory)/app/Dockerfile'
+  # Tag for the Docker image (using build ID)
   tag: '$(Build.BuildId)'
+  # Agent VM image name
   vmImageName: 'ubuntu-latest'
 
 stages:
