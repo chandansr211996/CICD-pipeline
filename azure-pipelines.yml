@@ -1,38 +1,90 @@
+# Node.js React Web App to Linux on Azure
+# Build a Node.js React app and deploy it to Azure as a Linux web app.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+
 trigger:
 - main
 
-resources:
-- repo: self
-
 variables:
-  # Azure Container Registry connection established during pipeline creation
-  dockerRegistryServiceConnection: 'CICDsampleregistry'
-  # Docker repository name
-  imageRepository: 'javascriptdocker'
-  # Docker container registry URL
-  containerRegistry: 'sampleappcontainerregistry.azurecr.io'
-  # Path to the Dockerfile in your repository
-  dockerfilePath: '$(Build.SourcesDirectory)/app/Dockerfile'
-  # Tag for the Docker image (using build ID)
-  tag: '$(Build.BuildId)'
+
+  # Azure Resource Manager connection created during pipeline creation
+  azureSubscription: 'ContractCenter-Dev-RG'
+
+  # Web app name
+  webAppName: 'contractcenter-dev'
+
+  # Environment name
+  environmentName: 'contractcenter-dev'
+
   # Agent VM image name
   vmImageName: 'ubuntu-latest'
 
+  # Resource group name: 
+  resourceGroupName: 'ContractCenter-Dev-RG'
+
 stages:
 - stage: Build
-  displayName: Build and push stage
+  displayName: 'Build Stage'
   jobs:
-  - job: Build
-    displayName: Build
+  - job: BuildJob
+    displayName: 'Build Job'
     pool:
-      vmImage: $(vmImageName)
-    steps:
-    - task: Docker@2
-      displayName: Build and push an image to container registry
+      vmImage: 'ubuntu-latest'
+    steps:    
+    
+    - task: UsePythonVersion@0
       inputs:
-        command: buildAndPush
-        repository: $(imageRepository)
-        dockerfile: $(dockerfilePath)
-        containerRegistry: $(dockerRegistryServiceConnection)
-        tags: |
-          $(tag)
+        versionSpec: '3.x'
+        addToPath: true
+
+    - script: |
+        sudo apt-get update
+        sudo apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxcomposite1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libpango-1.0-0 libgtk-3-0 libxdamage1 libxfixes3 libpangoft2-1.0-0 libx11-xcb1 libx11-6 libxcb1 libxext6 libxss1 libgconf-2-4 libnss3 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 fonts-noto-color-emoji fonts-freefont-ttf
+        sudo apt-get install -y wget
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -f -y
+      displayName: 'Install Dependencies for Headless Chrome'
+
+
+
+
+    - task: NodeTool@0
+      inputs:
+        versionSource: 'spec'
+        versionSpec: '20.x'
+      displayName: 'Install Node.js'
+
+    - task: Npm@1
+      displayName: 'Install node modules in client'
+      inputs:
+        command: 'install'
+        workingDir: 'Client'
+  
+
+    - task: Npm@1
+      displayName: 'Install node modules in server'
+      inputs:
+        command: 'install'
+        workingDir: 'Server'
+
+    - task: Npm@1
+      displayName: 'Build the frontend'
+      inputs:
+        command: 'custom'
+        workingDir: 'Client'
+        customCommand: 'run build'
+        
+
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+        replaceExistingArchive: true
+      displayName: 'Archive files'
+
+    - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+      artifact: release
+
